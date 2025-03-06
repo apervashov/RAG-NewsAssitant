@@ -1,0 +1,160 @@
+import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
+import { config } from '../config/env';
+import { Document } from '@langchain/core/documents';
+import { ArticleSource } from '../models/article';
+import { Subject } from 'rxjs';
+
+export class StreamingService {
+  private gemini: GoogleGenerativeAI | null = null;
+  private model: GenerativeModel | null = null;
+  private modelName: string = 'gemini-1.5-flash';
+  
+  constructor() {
+    
+    const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || config.gemini.apiKey || '';
+    
+    if (!apiKey) {
+      console.error("No API Key found for Gemini! Please set GEMINI_API_KEY or GOOGLE_API_KEY in .env");
+    } else {
+      console.log(`Initializing streaming service with API key length: ${apiKey.length}`);
+      console.log(`API key starts with: ${apiKey.substring(0, 5)}...`); 
+      
+      try {
+        this.gemini = new GoogleGenerativeAI(apiKey);
+        
+        
+        console.log("Checking available models...");
+        
+        
+        this.model = this.gemini.getGenerativeModel({ model: this.modelName });
+        console.log(`Successfully initialized Gemini model: ${this.modelName}`);
+      } catch (error) {
+        console.error(`Failed to initialize Gemini model: ${error}`);
+      }
+    }
+  }
+
+  
+  private async sendTestResponse(responseStream: Subject<string>, query: string, documents: Document[]): Promise<void> {
+    console.log("Sending fallback response - API unavailable");
+    
+    
+    responseStream.next("\n[FALLBACK MODE] Unable to get answer from Gemini API\n\n");
+    responseStream.next(`Your query: "${query}"\n\n`);
+    
+    
+    responseStream.next(`Found documents: ${documents.length}\n\n`);
+    
+    if (documents.length > 0) {
+      responseStream.next("Titles of found documents:\n");
+      for (const doc of documents) {
+        responseStream.next(`- ${doc.metadata.title || 'Without title'}\n`);
+      }
+      
+      
+      if (documents[0]) {
+        responseStream.next("\nExample content from the first document:\n");
+        responseStream.next("-----------------------------------\n");
+        const previewContent = documents[0].pageContent.substring(0, 300) + 
+          (documents[0].pageContent.length > 300 ? "..." : "");
+        responseStream.next(previewContent + "\n");
+        responseStream.next("-----------------------------------\n\n");
+      }
+    } else {
+      responseStream.next("No relevant documents found in the knowledge base.\n\n");
+    }
+    
+    responseStream.next("\nFallback response completed.");
+    responseStream.complete();
+  }
+
+  async streamResponse(query: string, documents: Document[]): Promise<Subject<string>> {
+    
+    const responseStream = new Subject<string>();
+    
+    console.log(`[Stream] Query: "${query.substring(0, 30)}..."`);
+    console.log(`[Stream] Documents: ${documents.length}`);
+    
+    try {
+      
+      if (!this.model) {
+        console.log("No model available, using fallback response");
+        await this.sendTestResponse(responseStream, query, documents);
+        return responseStream;
+      }
+
+      
+      let context = '';
+      if (documents.length > 0) {
+        context += 'Context from the knowledge base:\n\n';
+        for (let i = 0; i < Math.min(documents.length, 2); i++) { 
+          const doc = documents[i];
+          context += `Document ${i + 1}:\n`;
+          if (doc.metadata.title) context += `Title: ${doc.metadata.title}\n`;
+          if (doc.metadata.url) context += `URL: ${doc.metadata.url}\n`;
+          context += `\n${doc.pageContent.substring(0, 500)}...\n\n`;
+        }
+      }
+
+      
+      const prompt = `
+      You are a news analyst agent that answers user questions based on the provided context from the knowledge base.
+      
+      User's question: ${query}
+      
+      ${context}
+      
+      If there is relevant information in the context, use it to answer the question.
+      If there is not enough information in the context to provide a complete answer, indicate it explicitly.
+      Your answer should be informative and well-structured.
+      `;
+      
+      console.log(`[Stream] Sending prompt to Gemini`);
+      
+      try {
+        
+        responseStream.next("Requesting answer from Gemini...\n\n");
+        
+        
+        console.log("[Stream] Calling generateContentStream");
+        const result = await this.model.generateContentStream(prompt);
+        console.log("[Stream] Stream received from Gemini API");
+        
+        
+        responseStream.next("Receiving answer...\n\n");
+        
+        
+        for await (const chunk of result.stream) {
+          const chunkText = chunk.text();
+          console.log(`[Stream] Chunk received: ${chunkText ? chunkText.length : 0} chars`);
+          if (chunkText) {
+            responseStream.next(chunkText);
+          }
+        }
+        
+        console.log("[Stream] All chunks processed");
+        responseStream.next("\n\nAnswer generated by Gemini API.");
+        responseStream.complete();
+      } catch (error) {
+        console.error("[Stream] Error calling Gemini API:", error);
+        
+        
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        if (errorMsg.includes("not found for API") || errorMsg.includes("supported for generateContent")) {
+          responseStream.next("\nError: The specified model is not supported or unavailable.\n");
+          responseStream.next("API error: " + errorMsg + "\n\n");
+        } else {
+          responseStream.next("\nAn error occurred while calling Gemini API: " + errorMsg + "\n\n");
+        }
+        
+        await this.sendTestResponse(responseStream, query, documents);
+      }
+    } catch (error) {
+      console.error("[Stream] Fatal error:", error);
+      responseStream.next("\nA critical error occurred: " + (error instanceof Error ? error.message : String(error)));
+      responseStream.complete();
+    }
+    
+    return responseStream;
+  }
+} 

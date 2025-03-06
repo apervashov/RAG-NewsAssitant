@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест потокового API</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        #response {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            min-height: 200px;
+            white-space: pre-wrap;
+            overflow-y: auto;
+            max-height: 500px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            background-color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .loading {
+            margin-top: 10px;
+            display: none;
+            color: #666;
+        }
+        .loading.active {
+            display: block;
+        }
+        .stats {
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+            padding: 5px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+        }
+        .example-buttons {
+            margin: 15px 0;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .button-container {
+            display: flex;
+            margin: 15px 0;
+        }
+        .cursor {
+            display: inline-block;
+            width: 10px;
+            height: 20px;
+            background-color: #333;
+            animation: blink 1s infinite;
+            vertical-align: middle;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+        .test-tools {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        .test-tools h3 {
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test streaming API with Gemini</h1>
+    <input id="query" type="text" value="" placeholder="Enter your query">
+    
+    
+    <div class="button-container">
+        <button id="sendBtn" onclick="testStream()">Send request</button>
+        <button onclick="testWithFetch()">Fetch API test</button>
+        <button onclick="clearResponse()">Clear</button>
+    </div>
+    
+    <div class="loading" id="loading">Sending request and waiting for response...</div>
+    <div class="stats" id="stats"></div>
+    <div id="response"></div>
+    
+    <div class="test-tools">
+        <h3>Debug tools</h3>
+        <button onclick="testDirectFetch()">Direct fetch test</button>
+        <button onclick="testSimple()">Base request test</button>
+    </div>
+
+    <script>
+        // Устанавливает пример запроса в поле ввода
+        function setExample(text) {
+            document.getElementById('query').value = text;
+        }
+        
+        // Очищает поле ответа
+        function clearResponse() {
+            document.getElementById('response').textContent = '';
+            document.getElementById('stats').textContent = '';
+        }
+        
+        // Тест базового функционала fetch
+        function testSimple() {
+            const responseDiv = document.getElementById('response');
+            responseDiv.textContent = 'Checking basic request...';
+            
+            fetch('http://localhost:3000/')
+                .then(response => {
+                    responseDiv.textContent += `\nStatus: ${response.status} ${response.statusText}`;
+                    return response.text();
+                })
+                .then(text => {
+                    responseDiv.textContent += `\nReceived ${text.length} characters`;
+                })
+                .catch(error => {
+                    responseDiv.textContent += `\nError: ${error.message}`;
+                });
+        }
+        
+        // Тест прямого fetch без обработки потока
+        function testDirectFetch() {
+            const responseDiv = document.getElementById('response');
+            const query = document.getElementById('query').value;
+            responseDiv.textContent = 'Performing direct request...\n';
+            
+            fetch('http://localhost:3000/agent', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ query })
+            })
+            .then(response => {
+                responseDiv.textContent += `Status: ${response.status} ${response.statusText}\n`;
+                return response.json();
+            })
+            .then(data => {
+                responseDiv.textContent += `\nServer response:\n${JSON.stringify(data, null, 2)}`;
+            })
+            .catch(error => {
+                responseDiv.textContent += `\nError: ${error.message}`;
+            });
+        }
+        
+        // Тест с Fetch API для потокового ответа
+        function testWithFetch() {
+            const responseDiv = document.getElementById('response');
+            const query = document.getElementById('query').value;
+            
+            responseDiv.textContent = 'Starting test with Fetch API...\n';
+            
+            fetch('http://localhost:3000/agent/stream', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ query })
+            }).then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                
+                responseDiv.textContent += `Connection established (${response.status}), waiting for data...\n`;
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder('utf-8');
+                
+                function readChunk() {
+                    reader.read().then(({ done, value }) => {
+                        if (done) {
+                            responseDiv.textContent += '\n\n[Поток завершен]';
+                            return;
+                        }
+                        
+                        const chunk = decoder.decode(value, { stream: true });
+                        responseDiv.textContent += chunk;
+                        responseDiv.scrollTop = responseDiv.scrollHeight;
+                        
+                        // Продолжаем чтение
+                        readChunk();
+                    }).catch(error => {
+                        responseDiv.textContent += `\nError reading stream: ${error.message}`;
+                    });
+                }
+                
+                readChunk();
+            }).catch(error => {
+                responseDiv.textContent += `\nNetwork error: ${error.message}`;
+            });
+        }
+        
+        // Основная функция для тестирования потока
+        async function testStream() {
+            const responseDiv = document.getElementById('response');
+            const query = document.getElementById('query').value;
+            const loading = document.getElementById('loading');
+            const sendBtn = document.getElementById('sendBtn');
+            const statsDiv = document.getElementById('stats');
+            
+            // Блокируем кнопку и показываем индикатор загрузки
+            sendBtn.disabled = true;
+            loading.classList.add('active');
+            responseDiv.textContent = '';
+            
+            // Добавляем мигающий курсор
+            const cursor = document.createElement('span');
+            cursor.className = 'cursor';
+            responseDiv.appendChild(cursor);
+            
+            // Переменные для отслеживания статистики
+            let startTime = Date.now();
+            let bytesReceived = 0;
+            let chunkCount = 0;
+            
+            try {
+                // Сначала проверяем доступность сервера
+                let streamUrl = 'http://localhost:3000/agent/stream';
+                
+                try {
+                    const testResponse = await fetch('http://localhost:3000/', {
+                        method: 'GET',
+                        cache: 'no-cache'
+                    });
+                    
+                    if (!testResponse.ok) {
+                        throw new Error(`Сервер недоступен: ${testResponse.status}`);
+                    }
+                } catch (e) {
+                    // Если не удалось подключиться к порту 3000, пробуем порт 3001
+                    console.log("Trying port 3001...");
+                    try {
+                        const altResponse = await fetch('http://localhost:3001/', {
+                            method: 'GET',
+                            cache: 'no-cache'
+                        });
+                        
+                        if (altResponse.ok) {
+                            // Если сервер работает на порту 3001, изменяем URL для основного запроса
+                            streamUrl = 'http://localhost:3001/agent/stream';
+                            console.log("Using port 3001");
+                        }
+                    } catch (altError) {
+                        console.error("Error checking port 3001:", altError);
+                    }
+                }
+                
+                console.log(`Sending request to ${streamUrl}`);
+                const response = await fetch(streamUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ query })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error: ${response.status}`);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                
+                // Удаляем курсор перед началом получения ответа
+                responseDiv.removeChild(cursor);
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    // Обновляем статистику
+                    chunkCount++;
+                    bytesReceived += value.length;
+                    
+                    const text = decoder.decode(value, { stream: true });
+                    responseDiv.textContent += text;
+                    
+                    // Обновляем статистику в реальном времени
+                    const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(1);
+                    statsDiv.textContent = `Received: ${bytesReceived} bytes | Chunks: ${chunkCount} | Time: ${elapsedTime} sec`;
+                    
+                    // Прокручиваем вниз, чтобы видеть новый текст
+                    responseDiv.scrollTop = responseDiv.scrollHeight;
+                }
+                
+                // Финальная статистика
+                const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
+                statsDiv.textContent = `Total: ${bytesReceived} bytes | Chunks: ${chunkCount} | Time: ${totalTime} sec | Completed`;
+            } catch (error) {
+                // Удаляем курсор в случае ошибки
+                if (responseDiv.contains(cursor)) {
+                    responseDiv.removeChild(cursor);
+                }
+                
+                responseDiv.textContent += `\n\nError: ${error.message}`;
+                console.error('Error executing request:', error);
+            } finally {
+                // Разблокируем кнопку и скрываем индикатор загрузки
+                sendBtn.disabled = false;
+                loading.classList.remove('active');
+            }
+        }
+    </script>
+</body>
+</html> 
