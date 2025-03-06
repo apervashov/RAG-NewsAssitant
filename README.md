@@ -5,8 +5,8 @@ A Node.js application that provides a streaming API interface for Gemini AI mode
 ## Features
 
 - REST API endpoint for streaming AI responses
-- Integration with Google's Gemini models (gemini-1.5-pro, gemini-1.5-flash)
-- Vector database storage using hnswlib-node
+- Integration with Google's Gemini models
+- Vector database storage
 - Test page for easy API interaction
 
 ## Requirements
@@ -24,23 +24,23 @@ A Node.js application that provides a streaming API interface for Gemini AI mode
 2. Set your Google API Key:
    Create a `.env` file in the project root:
    ```
-KAFKA_BROKER=
-KAFKA_USERNAME=
-KAFKA_PASSWORD=
-KAFKA_TOPIC_NAME=
-KAFKA_GROUP_ID_PREFIX=
+   KAFKA_BROKER=
+   KAFKA_USERNAME=
+   KAFKA_PASSWORD=
+   KAFKA_TOPIC_NAME=
+   KAFKA_GROUP_ID_PREFIX=
 
 
-GOOGLE_API_KEY=
+   GOOGLE_API_KEY=
 
 
-PORT=3000
-LANGFUSE_PUBLIC_KEY=
-LANGFUSE_SECRET_KEY=
-LANGFUSE_PROJECT_NAME=
+   PORT=3000
+   LANGFUSE_PUBLIC_KEY=
+   LANGFUSE_SECRET_KEY=
+   LANGFUSE_PROJECT_NAME=
    ```
 
-3. Build and run with Docker Compose:
+3. Build and run it:
    ```
    npm run dev
    ```
