@@ -11,7 +11,7 @@ const { Pinecone } = require('@pinecone-database/pinecone');
 // Инициализация Google Generative AI
 const googleApiKey = process.env.GOOGLE_API_KEY || '';
 if (!googleApiKey) {
-  console.error('ОШИБКА: GOOGLE_API_KEY не установлен');
+  console.error('ERROR: GOOGLE_API_KEY not set');
   process.exit(1);
 }
 
@@ -19,7 +19,7 @@ if (!googleApiKey) {
 const pineconeApiKey = process.env.PINECONE_API_KEY || '';
 const pineconeIndex = process.env.PINECONE_INDEX || 'someindex1';
 if (!pineconeApiKey) {
-  console.error('ОШИБКА: PINECONE_API_KEY не установлен');
+  console.error('ERROR: PINECONE_API_KEY not set');
   process.exit(1);
 }
 
@@ -250,7 +250,7 @@ async function loadDataToPinecone() {
     
     // Проверка существующих данных
     const documentCount = await vectorDB.countDocuments();
-    console.log(`There are ${documentCount} documents in the database`);
+    console.log(`Database currently contains ${documentCount} documents`);
     
     // Проверка существования CSV-файла
     if (!fs.existsSync(csvFilePath)) {
@@ -314,7 +314,7 @@ async function loadDataToPinecone() {
         });
         
         added++;
-        console.log(`Document ${id} successfully added to Pinecone (${added} of ${articles.length})`);
+        console.log(`Added document ${added}/${articles.length}`);
       } catch (embeddingError) {
         console.error(`Error creating embedding for ${article.URL}:`, embeddingError);
         failed++;
@@ -324,29 +324,29 @@ async function loadDataToPinecone() {
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
     
-    console.log('\nData loading completed:');
-    console.log(`- Total processed: ${processed} records`);
-    console.log(`- Successfully added: ${added} documents`);
-    console.log(`- Skipped: ${skipped} records`);
-    console.log(`- Failed to process: ${failed} records`);
+    console.log('\nSummary:');
+    console.log(`- Processed: ${processed}`);
+    console.log(`- Added: ${added}`);
+    console.log(`- Skipped: ${skipped}`);
+    console.log(`- Failed: ${failed}`);
     
     // Проверка итогового количества документов
     const finalCount = await vectorDB.countDocuments();
-    console.log(`\nFinal number of documents in the database: ${finalCount}`);
+    console.log(`Final document count: ${finalCount}`);
     
   } catch (error) {
-    console.error('Error loading data:', error);
+    console.error('Error:', error);
   }
 }
 
 // Запуск загрузки данных
-console.log('Starting data loading from CSV to Pinecone...');
+console.log('Starting data import from CSV to Pinecone...');
 loadDataToPinecone()
   .then(() => {
-    console.log('Data loading completed successfully');
+    console.log('Data import completed');
     process.exit(0);
   })
   .catch(error => {
-    console.error('Critical error during data loading:', error);
+    console.error('Critical error:', error);
     process.exit(1);
   }); 

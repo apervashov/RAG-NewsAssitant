@@ -22,14 +22,14 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Инициализация Google Generative AI
 const googleApiKey = process.env.GOOGLE_API_KEY || '';
 if (!googleApiKey) {
-  console.error('ОШИБКА: GOOGLE_API_KEY не установлен');
+  console.error('ERROR: GOOGLE_API_KEY not set');
 }
 
 // Инициализация Pinecone
 const pineconeApiKey = process.env.PINECONE_API_KEY || '';
 const pineconeIndex = process.env.PINECONE_INDEX || 'someindex1';
 if (!pineconeApiKey) {
-  console.error('ОШИБКА: PINECONE_API_KEY не установлен');
+  console.error('ERROR: PINECONE_API_KEY not set');
 }
 
 let pineconeClient = null;
@@ -59,11 +59,11 @@ class VectorDB {
       
       // Проверяем подключение запросом статистики
       const stats = await pineconeIndexClient.describeIndexStats();
-      console.log(`Successfully connected to index ${pineconeIndex}, vectors: ${stats.totalVectorCount}`);
+      console.log(`Connected to index ${pineconeIndex}, vectors: ${stats.totalVectorCount}`);
       
       isInitialized = true;
     } catch (error) {
-      console.error('Error initializing Pinecone:', error);
+      console.error('Pinecone initialization error:', error);
       throw error;
     }
   }
@@ -74,7 +74,7 @@ class VectorDB {
       const result = await this.textEmbeddingModel.embedContent(text);
       return result.embedding.values;
     } catch (error) {
-      console.error('Error creating embedding:', error);
+      console.error('Embedding creation error:', error);
       throw error;
     }
   }
@@ -106,7 +106,7 @@ class VectorDB {
         }))
       };
     } catch (error) {
-      console.error('Error searching for similar documents:', error);
+      console.error('Similarity search error:', error);
       // Возвращаем пустой результат в случае ошибки
       return {
         documents: [],
@@ -138,8 +138,8 @@ app.post('/api/agent', async (req, res) => {
 
     if (!query) {
       return res.status(400).json({
-        error: 'Отсутствует query',
-        message: 'Параметр query обязателен для запроса'
+        error: 'Missing query',
+        message: 'Query parameter is required'
       });
     }
 
@@ -238,7 +238,7 @@ app.post('/api/agent', async (req, res) => {
       sources: sources
     });
   } catch (error) {
-    console.error('Error in /api/agent:', error);
+    console.error('API error:', error);
     return res.status(500).json({
       error: 'Internal server error',
       message: error.message
@@ -254,8 +254,8 @@ app.post('/api/stream', async (req, res) => {
 
     if (!query) {
       return res.status(400).json({
-        error: 'Отсутствует query',
-        message: 'Параметр query обязателен для запроса'
+        error: 'Missing query',
+        message: 'Query parameter is required'
       });
     }
 
@@ -267,7 +267,7 @@ app.post('/api/stream', async (req, res) => {
     res.setHeader('X-Accel-Buffering', 'no');
 
     // Начальное сообщение
-    res.write('Starting request processing...\n\n');
+    res.write('Processing request...\n\n');
 
     // Попытка быстрой инициализации, если необходимо
     if (!isInitialized) {
@@ -275,7 +275,7 @@ app.post('/api/stream', async (req, res) => {
       const success = await fastInitialize();
       
       if (!success) {
-        res.write('Failed to connect to the database, using direct API response...\n\n');
+        res.write('Direct API response mode\n\n');
         
         // Используем Gemini API напрямую
         const genAI = new GoogleGenerativeAI(googleApiKey);
@@ -292,7 +292,7 @@ app.post('/api/stream', async (req, res) => {
         // Потоковая генерация без контекста
         const streamingResponse = await model.generateContentStream(prompt);
         
-        res.write('Received response from Gemini API:\n\n');
+        res.write('Answer:\n\n');
         
         // Обрабатываем потоковые данные
         for await (const chunk of streamingResponse.stream) {
@@ -306,7 +306,7 @@ app.post('/api/stream', async (req, res) => {
         return;
       }
       
-      res.write('Successfully connected to Pinecone database\n\n');
+      res.write('Connected to Pinecone database\n\n');
     }
 
     try {
@@ -315,7 +315,7 @@ app.post('/api/stream', async (req, res) => {
       const { documents, sources } = await vectorDB.similaritySearch(query, 3);
       
       if (documents.length === 0) {
-        res.write('Relevant documents not found, using direct API request...\n\n');
+        res.write('No relevant documents found, using direct API...\n\n');
         
         // Используем Gemini API напрямую
         const genAI = new GoogleGenerativeAI(googleApiKey);
@@ -334,7 +334,7 @@ app.post('/api/stream', async (req, res) => {
         // Потоковая генерация без контекста
         const streamingResponse = await model.generateContentStream(prompt);
         
-        res.write('Received response from Gemini API:\n\n');
+        res.write('Answer:\n\n');
         
         // Обрабатываем потоковые данные
         for await (const chunk of streamingResponse.stream) {
@@ -377,7 +377,7 @@ app.post('/api/stream', async (req, res) => {
       // Потоковая генерация с контекстом
       const streamingResponse = await model.generateContentStream(contextPrompt);
       
-      res.write('Response based on context:\n\n');
+      res.write('Answer based on context:\n\n');
       
       // Обрабатываем потоковые данные
       for await (const chunk of streamingResponse.stream) {
@@ -390,20 +390,20 @@ app.post('/api/stream', async (req, res) => {
       res.end();
       
     } catch (apiError) {
-      console.error('Error working with API:', apiError);
-      res.write(`Error working with API: ${apiError.message}\n`);
+      console.error('API error:', apiError);
+      res.write(`API error: ${apiError.message}\n`);
       res.end();
     }
     
   } catch (error) {
-    console.error('Error in /api/stream:', error);
+    console.error('Stream error:', error);
     if (!res.headersSent) {
       return res.status(500).json({
         error: 'Internal server error',
         message: error.message
       });
     } else {
-      res.write(`\nAn error occurred: ${error.message}`);
+      res.write(`\nError occurred: ${error.message}`);
       res.end();
     }
   }
@@ -441,7 +441,7 @@ if (process.env.NODE_ENV !== 'production') {
 const port = process.env.PORT || 3000;
 if (process.env.NODE_ENV !== 'production') {
   app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
+    console.log(`Server running on port ${port}`);
   });
 }
 
