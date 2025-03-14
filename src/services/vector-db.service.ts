@@ -1,74 +1,49 @@
-import { HNSWLib } from '@langchain/community/vectorstores/hnswlib';
 import { GoogleGenerativeAIEmbeddings } from '@langchain/google-genai';
 import { Document } from '@langchain/core/documents';
 import { config } from '../config/env';
 import { Article, ArticleSource } from '../models/article';
-import fs from 'fs';
-import path from 'path';
+import { PineconeStore } from '@langchain/pinecone';
+import { Pinecone } from '@pinecone-database/pinecone';
 import { logApiKey } from '../utils/logger';
 
 export class VectorDBService {
-  private vectorStore: HNSWLib | null = null;
+  private vectorStore: PineconeStore | null = null;
   private embeddings: GoogleGenerativeAIEmbeddings;
-  private readonly dbDirectory: string;
+  private pinecone: Pinecone;
   private isInitialized: boolean = false;
+  private readonly indexName: string;
 
   constructor() {
-    
     logApiKey("Using Google API Key from config", config.gemini.apiKey);
-    logApiKey("Environment GOOGLE_API_KEY", process.env.GOOGLE_API_KEY);
     
     this.embeddings = new GoogleGenerativeAIEmbeddings({
       apiKey: config.gemini.apiKey,
       modelName: 'embedding-001',
     });
-    this.dbDirectory = path.join(process.cwd(), 'vector_db');
+    
+    // Инициализация Pinecone
+    this.pinecone = new Pinecone({
+      apiKey: process.env.PINECONE_API_KEY!,
+    });
+    
+    this.indexName = process.env.PINECONE_INDEX || 'gemini-vectorstore';
   }
 
   async initialize(): Promise<void> {
     try {
-      if (fs.existsSync(this.dbDirectory)) {
-        console.log('Loading existing vector database...');
-        try {
-          this.vectorStore = await HNSWLib.load(this.dbDirectory, this.embeddings);
-          console.log('Vector database loaded successfully');
-          this.isInitialized = true;
-        } catch (error) {
-          console.error('Error loading vector database:', error);
-          console.log('Creating new vector database due to loading error...');
-          
-          const initialDocument = new Document({
-            pageContent: 'Initial document for vector db initialization',
-            metadata: {
-              title: 'Initialization Document',
-              url: 'https:
-              date: new Date().toISOString().split('T')[0],
-            },
-          });
-          
-          this.vectorStore = await HNSWLib.fromDocuments([initialDocument], this.embeddings);
-          this.isInitialized = true;
-          await this.saveVectorStore();
-        }
-      } else {
-        console.log('Creating new vector database...');
-        
-        const initialDocument = new Document({
-          pageContent: 'Initial document for vector db initialization',
-          metadata: {
-            title: 'Initialization Document',
-            url: 'https:
-            date: new Date().toISOString().split('T')[0],
-          },
-        });
-        
-        this.vectorStore = await HNSWLib.fromDocuments([initialDocument], this.embeddings);
-        this.isInitialized = true;
-        await this.saveVectorStore();
-        console.log('New vector database created successfully');
-      }
+      console.log('Initializing Pinecone vector store...');
+      const pineconeIndex = this.pinecone.Index(this.indexName);
+      
+      // Создаем хранилище на основе существующего индекса
+      this.vectorStore = await PineconeStore.fromExistingIndex(
+        this.embeddings,
+        { pineconeIndex }
+      );
+      
+      this.isInitialized = true;
+      console.log('Pinecone vector store initialized successfully');
     } catch (error) {
-      console.error('Error initializing vector database:', error);
+      console.error('Error initializing Pinecone vector store:', error);
       throw error;
     }
   }
@@ -89,10 +64,9 @@ export class VectorDBService {
       });
 
       await this.vectorStore!.addDocuments([document]);
-      await this.saveVectorStore();
-      console.log(`Article added to vector database: ${article.title}`);
+      console.log(`Article added to Pinecone: ${article.title}`);
     } catch (error) {
-      console.error('Error adding article to vector database:', error);
+      console.error('Error adding article to Pinecone:', error);
       throw error;
     }
   }
@@ -118,21 +92,9 @@ export class VectorDBService {
     }
   }
 
+  // Метод теперь используется только для совместимости
   private async saveVectorStore(): Promise<void> {
-    try {
-      if (!this.vectorStore) {
-        throw new Error('Vector store is not initialized');
-      }
-      
-      if (!fs.existsSync(this.dbDirectory)) {
-        fs.mkdirSync(this.dbDirectory, { recursive: true });
-      }
-      
-      await this.vectorStore.save(this.dbDirectory);
-      console.log('Vector database saved successfully');
-    } catch (error) {
-      console.error('Error saving vector database:', error);
-      throw error;
-    }
+    // В Pinecone данные сохраняются автоматически
+    console.log('Data saved to Pinecone');
   }
 } 

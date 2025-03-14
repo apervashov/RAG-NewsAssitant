@@ -154,7 +154,6 @@
                 });
         }
         
-        // Тест прямого fetch без обработки потока
         function testDirectFetch() {
             const responseDiv = document.getElementById('response');
             const query = document.getElementById('query').value;
@@ -179,7 +178,6 @@
             });
         }
         
-        // Тест с Fetch API для потокового ответа
         function testWithFetch() {
             const responseDiv = document.getElementById('response');
             const query = document.getElementById('query').value;
@@ -213,7 +211,6 @@
                         responseDiv.textContent += chunk;
                         responseDiv.scrollTop = responseDiv.scrollHeight;
                         
-                        // Продолжаем чтение
                         readChunk();
                     }).catch(error => {
                         responseDiv.textContent += `\nError reading stream: ${error.message}`;
@@ -226,7 +223,6 @@
             });
         }
         
-        // Основная функция для тестирования потока
         async function testStream() {
             const responseDiv = document.getElementById('response');
             const query = document.getElementById('query').value;
@@ -234,23 +230,19 @@
             const sendBtn = document.getElementById('sendBtn');
             const statsDiv = document.getElementById('stats');
             
-            // Блокируем кнопку и показываем индикатор загрузки
             sendBtn.disabled = true;
             loading.classList.add('active');
             responseDiv.textContent = '';
             
-            // Добавляем мигающий курсор
             const cursor = document.createElement('span');
             cursor.className = 'cursor';
             responseDiv.appendChild(cursor);
             
-            // Переменные для отслеживания статистики
             let startTime = Date.now();
             let bytesReceived = 0;
             let chunkCount = 0;
             
             try {
-                // Сначала проверяем доступность сервера
                 let streamUrl = 'http://localhost:3000/agent/stream';
                 
                 try {
@@ -260,10 +252,9 @@
                     });
                     
                     if (!testResponse.ok) {
-                        throw new Error(`Сервер недоступен: ${testResponse.status}`);
+                        throw new Error(`Server is not available: ${testResponse.status}`);
                     }
                 } catch (e) {
-                    // Если не удалось подключиться к порту 3000, пробуем порт 3001
                     console.log("Trying port 3001...");
                     try {
                         const altResponse = await fetch('http://localhost:3001/', {
@@ -272,7 +263,6 @@
                         });
                         
                         if (altResponse.ok) {
-                            // Если сервер работает на порту 3001, изменяем URL для основного запроса
                             streamUrl = 'http://localhost:3001/agent/stream';
                             console.log("Using port 3001");
                         }
