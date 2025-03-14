@@ -31,10 +31,10 @@
     "ts-node-dev": "^2.0.0"
   },
   "scripts": {
-    "start": "node server.js",
-    "dev": "ts-node-dev --respawn src/app.ts",
-    "build": "tsc",
-    "serve": "node server.js",
+    "start": "node pure-server.js",
+    "dev": "node pure-server.js",
+    "build": "echo 'No build needed for JavaScript server'",
+    "serve": "node pure-server.js",
     "check-env": "node check-env.js"
   }
 }
