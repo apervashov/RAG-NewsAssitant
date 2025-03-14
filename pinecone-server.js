@@ -4,13 +4,8 @@ const express = require('express');
 const path = require('path');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const fs = require('fs');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { Pinecone } = require('@pinecone-database/pinecone');
-const csv = require('csv-parser');
-const axios = require('axios');
-const cheerio = require('cheerio');
-const crypto = require('crypto');
 
 // Создаем приложение Express
 const app = express();
@@ -51,36 +46,22 @@ class VectorDB {
   // Инициализация подключения к Pinecone
   async initialize() {
     try {
+      // Уже инициализирован
+      if (isInitialized) {
+        return;
+      }
+      
       console.log('Инициализация Pinecone...');
       pineconeClient = new Pinecone({ apiKey: pineconeApiKey });
       
-      // Получение списка индексов
-      const indexList = await pineconeClient.listIndexes();
-      console.log('Доступные индексы Pinecone:', indexList);
-      
-      // Проверка существования индекса
-      let indexExists = false;
-      for (const index of indexList) {
-        if (index.name === pineconeIndex) {
-          indexExists = true;
-          break;
-        }
-      }
-      
-      // Создание индекса, если его не существует
-      if (!indexExists) {
-        console.log(`Индекс ${pineconeIndex} не найден, создаю новый...`);
-        await pineconeClient.createIndex({
-          name: pineconeIndex,
-          dimension: 768, // Размерность эмбеддингов
-          metric: 'cosine'
-        });
-        console.log(`Индекс ${pineconeIndex} создан успешно`);
-      }
-      
+      // Подключаемся к существующему индексу
       pineconeIndexClient = pineconeClient.Index(pineconeIndex);
+      
+      // Проверяем подключение запросом статистики
+      const stats = await pineconeIndexClient.describeIndexStats();
+      console.log(`Успешное подключение к индексу ${pineconeIndex}, векторов: ${stats.totalVectorCount}`);
+      
       isInitialized = true;
-      console.log('Pinecone инициализирован успешно');
     } catch (error) {
       console.error('Ошибка при инициализации Pinecone:', error);
       throw error;
@@ -98,21 +79,6 @@ class VectorDB {
     }
   }
 
-  // Создание записи в Pinecone
-  async upsertDocument(id, vector, metadata) {
-    try {
-      await pineconeIndexClient.upsert([{
-        id: id,
-        values: vector,
-        metadata: metadata
-      }]);
-      console.log(`Документ ${id} сохранен в Pinecone`);
-    } catch (error) {
-      console.error('Ошибка при сохранении документа в Pinecone:', error);
-      throw error;
-    }
-  }
-
   // Поиск похожих документов по запросу
   async similaritySearch(query, k = 3) {
     try {
@@ -122,6 +88,14 @@ class VectorDB {
         topK: k,
         includeMetadata: true
       });
+      
+      // Проверка наличия результатов
+      if (!results.matches || results.matches.length === 0) {
+        return {
+          documents: [],
+          sources: []
+        };
+      }
       
       return {
         documents: results.matches.map(match => match.metadata.content || ''),
@@ -133,180 +107,28 @@ class VectorDB {
       };
     } catch (error) {
       console.error('Ошибка при поиске похожих документов:', error);
-      throw error;
-    }
-  }
-}
-
-// Класс для получения содержимого статей
-class ContentExtractor {
-  // Получение HTML страницы
-  async fetchHtml(url) {
-    try {
-      console.log(`Загрузка страницы: ${url}`);
-      const response = await axios.get(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-      });
-      return response.data;
-    } catch (error) {
-      console.error(`Ошибка при загрузке страницы ${url}:`, error.message);
-      return null;
-    }
-  }
-
-  // Извлечение контента из HTML
-  extractContent(html, url) {
-    if (!html) return null;
-    
-    try {
-      const $ = cheerio.load(html);
-      
-      // Удаление ненужных элементов
-      $('script, style, nav, footer, header, iframe, .ads, .comments, .sidebar').remove();
-      
-      // Получение заголовка
-      let title = $('title').text().trim() || $('h1').first().text().trim() || '';
-      
-      // Получение основного контента
-      let content = '';
-      
-      // Приоритетные селекторы для разных сайтов
-      const selectors = [
-        'article', 
-        '.article', 
-        '.content', 
-        '.post-content', 
-        '.entry-content', 
-        'main',
-        '#content',
-        '.main-content'
-      ];
-      
-      // Пробуем разные селекторы
-      let found = false;
-      for (const selector of selectors) {
-        if ($(selector).length) {
-          content = $(selector).text().replace(/\s+/g, ' ').trim();
-          found = true;
-          break;
-        }
-      }
-      
-      // Если ничего не нашли, берем все параграфы
-      if (!found || content.length < 100) {
-        content = $('p').text().replace(/\s+/g, ' ').trim();
-      }
-      
-      // Если все еще мало контента, берем все тело
-      if (content.length < 100) {
-        content = $('body').text().replace(/\s+/g, ' ').trim();
-      }
-      
-      if (!title) title = url.split('/').pop() || 'Unknown Title';
-      
+      // Возвращаем пустой результат в случае ошибки
       return {
-        title,
-        content,
-        url,
-        date: new Date().toISOString().split('T')[0]
+        documents: [],
+        sources: []
       };
-    } catch (error) {
-      console.error(`Ошибка при извлечении контента из ${url}:`, error);
-      return null;
     }
   }
-
-  // Извлечение статьи из URL
-  async extractArticle(url) {
-    const html = await this.fetchHtml(url);
-    if (!html) return null;
-    
-    return this.extractContent(html, url);
-  }
 }
 
-// Обработчик CSV данных
-class CsvProcessor {
-  // Загрузка данных из CSV файла
-  async loadFromCsv(filePath) {
-    return new Promise((resolve, reject) => {
-      const results = [];
-      
-      fs.createReadStream(filePath)
-        .pipe(csv())
-        .on('data', (data) => results.push(data))
-        .on('end', () => {
-          console.log(`Загружено ${results.length} записей из ${filePath}`);
-          resolve(results);
-        })
-        .on('error', (error) => {
-          console.error(`Ошибка при чтении CSV файла ${filePath}:`, error);
-          reject(error);
-        });
-    });
-  }
-}
-
-// Имя CSV файла
-const csvFilePath = 'articles_dataset.csv';
-
-// Создаем экземпляры классов
+// Создаем один экземпляр VectorDB
 const vectorDB = new VectorDB();
-const contentExtractor = new ContentExtractor();
-const csvProcessor = new CsvProcessor();
 
-// Инициализация и загрузка данных
-async function initializeApp() {
+// Логика быстрой инициализации
+const fastInitialize = async () => {
   try {
-    // Инициализация векторной базы данных
     await vectorDB.initialize();
-    
-    // Проверка существования CSV-файла
-    if (!fs.existsSync(csvFilePath)) {
-      console.error(`Файл ${csvFilePath} не найден`);
-      return;
-    }
-    
-    // Загрузка данных из CSV
-    const articles = await csvProcessor.loadFromCsv(csvFilePath);
-    console.log(`Загружено ${articles.length} статей из CSV-файла`);
-    
-    // Обработка каждой статьи
-    for (const article of articles) {
-      if (!article.URL) continue;
-      
-      // Получение содержимого статьи
-      const extractedArticle = await contentExtractor.extractArticle(article.URL);
-      if (!extractedArticle) {
-        console.warn(`Не удалось извлечь содержимое из ${article.URL}`);
-        continue;
-      }
-      
-      console.log(`Обработка статьи: ${extractedArticle.title}`);
-      
-      // Создание уникального идентификатора
-      const id = crypto.createHash('md5').update(article.URL).digest('hex');
-      
-      // Получение эмбеддинга для содержимого
-      const embedding = await vectorDB.getEmbedding(extractedArticle.content);
-      
-      // Сохранение в Pinecone
-      await vectorDB.upsertDocument(id, embedding, {
-        title: extractedArticle.title,
-        content: extractedArticle.content,
-        url: article.URL,
-        date: extractedArticle.date,
-        source: article.Source || 'Unknown'
-      });
-    }
-    
-    console.log('Загрузка данных завершена успешно');
+    return true;
   } catch (error) {
-    console.error('Ошибка при инициализации приложения:', error);
+    console.error('Не удалось подключиться к Pinecone:', error);
+    return false;
   }
-}
+};
 
 // API для обработки запросов
 app.post('/api/agent', async (req, res) => {
@@ -321,11 +143,40 @@ app.post('/api/agent', async (req, res) => {
       });
     }
 
+    // Попытка быстрой инициализации, если необходимо
     if (!isInitialized) {
-      return res.status(500).json({
-        error: 'База данных не инициализирована',
-        message: 'Пожалуйста, дождитесь завершения инициализации'
-      });
+      const success = await fastInitialize();
+      
+      if (!success) {
+        console.log('Не удалось инициализировать базу данных, использую прямой ответ API');
+        
+        // Используем Gemini API напрямую
+        const genAI = new GoogleGenerativeAI(googleApiKey);
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        
+        const prompt = `
+        You are a helpful AI assistant. Answer the following question:
+        
+        ${query}
+        
+        Provide a comprehensive, informative and helpful response.
+        `;
+        
+        const result = await model.generateContent(prompt);
+        const response = result.response;
+        const text = response.text();
+        
+        return res.status(200).json({
+          answer: text,
+          sources: [
+            {
+              title: "Direct AI Response",
+              url: "https://ai.google.dev/",
+              date: new Date().toISOString().split('T')[0]
+            }
+          ]
+        });
+      }
     }
 
     // Поиск похожих документов
@@ -418,10 +269,44 @@ app.post('/api/stream', async (req, res) => {
     // Начальное сообщение
     res.write('Начинаю обработку запроса...\n\n');
 
+    // Попытка быстрой инициализации, если необходимо
     if (!isInitialized) {
-      res.write('Ошибка: База данных не инициализирована. Пожалуйста, дождитесь завершения инициализации.\n');
-      res.end();
-      return;
+      res.write('Подключаюсь к базе данных Pinecone...\n');
+      const success = await fastInitialize();
+      
+      if (!success) {
+        res.write('Не удалось подключиться к базе данных, использую прямой ответ API...\n\n');
+        
+        // Используем Gemini API напрямую
+        const genAI = new GoogleGenerativeAI(googleApiKey);
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        
+        const prompt = `
+        You are a helpful AI assistant. Answer the following question:
+        
+        ${query}
+        
+        Provide a comprehensive, informative and helpful response.
+        `;
+        
+        // Потоковая генерация без контекста
+        const streamingResponse = await model.generateContentStream(prompt);
+        
+        res.write('Получен ответ от Gemini API:\n\n');
+        
+        // Обрабатываем потоковые данные
+        for await (const chunk of streamingResponse.stream) {
+          const chunkText = chunk.text();
+          res.write(chunkText);
+        }
+        
+        // Завершаем ответ
+        res.write('\n\nГенерация завершена.');
+        res.end();
+        return;
+      }
+      
+      res.write('Успешно подключился к базе данных Pinecone\n\n');
     }
 
     try {
@@ -541,10 +426,16 @@ app.use((err, req, res, next) => {
   }
 });
 
-// Инициализация приложения
-initializeApp().catch(error => {
-  console.error('Ошибка при инициализации:', error);
-});
+// Быстрая инициализация при запуске в режиме разработки
+if (process.env.NODE_ENV !== 'production') {
+  fastInitialize().then(success => {
+    if (success) {
+      console.log('Успешно подключился к Pinecone при запуске');
+    } else {
+      console.warn('Не удалось подключиться к Pinecone при запуске, будет выполнена инициализация при первом запросе');
+    }
+  });
+}
 
 // Запуск сервера для локальной разработки
 const port = process.env.PORT || 3000;

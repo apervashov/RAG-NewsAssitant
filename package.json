@@ -36,6 +36,7 @@
     "dev": "node pinecone-server.js",
     "build": "echo 'No build needed for JavaScript server'",
     "serve": "node pinecone-server.js",
-    "check-env": "node check-env.js"
+    "check-env": "node check-env.js",
+    "load-data": "node load-data.js"
   }
 }
