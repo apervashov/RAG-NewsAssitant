@@ -1,12 +1,12 @@
 {
   "version": 2,
   "builds": [
-    { "src": "pure-server.js", "use": "@vercel/node" },
+    { "src": "pinecone-server.js", "use": "@vercel/node" },
     { "src": "public/**", "use": "@vercel/static" }
   ],
   "routes": [
-    { "src": "/api/(.*)", "dest": "/pure-server.js" },
+    { "src": "/api/(.*)", "dest": "/pinecone-server.js" },
     { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/pure-server.js" }
+    { "src": "/(.*)", "dest": "/pinecone-server.js" }
   ]
 } 

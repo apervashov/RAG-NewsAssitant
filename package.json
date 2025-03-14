@@ -13,6 +13,7 @@
     "body-parser": "^1.20.3",
     "cheerio": "^1.0.0",
     "cors": "^2.8.5",
+    "csv-parser": "^3.0.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "graphql": "^16.10.0",
@@ -31,10 +32,10 @@
     "ts-node-dev": "^2.0.0"
   },
   "scripts": {
-    "start": "node pure-server.js",
-    "dev": "node pure-server.js",
+    "start": "node pinecone-server.js",
+    "dev": "node pinecone-server.js",
     "build": "echo 'No build needed for JavaScript server'",
-    "serve": "node pure-server.js",
+    "serve": "node pinecone-server.js",
     "check-env": "node check-env.js"
   }
 }
