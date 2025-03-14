@@ -36,16 +36,18 @@ class VectorDB {
   // Инициализация подключения к Pinecone
   async initialize() {
     try {
-      console.log('Инициализация Pinecone...');
+      console.log('Initializing Pinecone...');
       pineconeClient = new Pinecone({ apiKey: pineconeApiKey });
       
       // Получение списка индексов
-      const indexList = await pineconeClient.listIndexes();
-      console.log('Доступные индексы Pinecone:', indexList);
+      const indexListResponse = await pineconeClient.listIndexes();
+      console.log('Available Pinecone indexes:', indexListResponse);
       
       // Проверка существования индекса
       let indexExists = false;
-      for (const index of indexList) {
+      const indexes = indexListResponse.indexes || [];
+      
+      for (const index of indexes) {
         if (index.name === pineconeIndex) {
           indexExists = true;
           break;
@@ -54,19 +56,19 @@ class VectorDB {
       
       // Создание индекса, если его не существует
       if (!indexExists) {
-        console.log(`Индекс ${pineconeIndex} не найден, создаю новый...`);
+        console.log(`Index ${pineconeIndex} not found, creating new...`);
         await pineconeClient.createIndex({
           name: pineconeIndex,
           dimension: 768, // Размерность эмбеддингов
           metric: 'cosine'
         });
-        console.log(`Индекс ${pineconeIndex} создан успешно`);
+        console.log(`Index ${pineconeIndex} created successfully`);
       }
       
       pineconeIndexClient = pineconeClient.Index(pineconeIndex);
-      console.log('Pinecone инициализирован успешно');
+      console.log('Pinecone initialized successfully');
     } catch (error) {
-      console.error('Ошибка при инициализации Pinecone:', error);
+      console.error('Error initializing Pinecone:', error);
       throw error;
     }
   }
@@ -77,7 +79,7 @@ class VectorDB {
       const result = await this.textEmbeddingModel.embedContent(text);
       return result.embedding.values;
     } catch (error) {
-      console.error('Ошибка при создании эмбеддинга:', error);
+      console.error('Error creating embedding:', error);
       throw error;
     }
   }
@@ -90,9 +92,9 @@ class VectorDB {
         values: vector,
         metadata: metadata
       }]);
-      console.log(`Документ ${id} сохранен в Pinecone`);
+      console.log(`Document ${id} saved to Pinecone`);
     } catch (error) {
-      console.error('Ошибка при сохранении документа в Pinecone:', error);
+      console.error('Error saving document to Pinecone:', error);
       throw error;
     }
   }
@@ -103,7 +105,7 @@ class VectorDB {
       const result = await pineconeIndexClient.fetch([id]);
       return result.vectors && result.vectors[id] ? true : false;
     } catch (error) {
-      console.error(`Ошибка при проверке документа ${id}:`, error);
+      console.error(`Error checking document ${id}:`, error);
       return false;
     }
   }
@@ -114,7 +116,7 @@ class VectorDB {
       const stats = await pineconeIndexClient.describeIndexStats();
       return stats.totalVectorCount;
     } catch (error) {
-      console.error('Ошибка при подсчете документов:', error);
+      console.error('Error counting documents:', error);
       return 0;
     }
   }
@@ -125,7 +127,7 @@ class ContentExtractor {
   // Получение HTML страницы
   async fetchHtml(url) {
     try {
-      console.log(`Загрузка страницы: ${url}`);
+      console.log(`Loading page: ${url}`);
       const response = await axios.get(url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
@@ -134,7 +136,7 @@ class ContentExtractor {
       });
       return response.data;
     } catch (error) {
-      console.error(`Ошибка при загрузке страницы ${url}:`, error.message);
+      console.error(`Error loading page ${url}:`, error.message);
       return null;
     }
   }
@@ -196,7 +198,7 @@ class ContentExtractor {
         date: new Date().toISOString().split('T')[0]
       };
     } catch (error) {
-      console.error(`Ошибка при извлечении контента из ${url}:`, error);
+      console.error(`Error extracting content from ${url}:`, error);
       return null;
     }
   }
@@ -221,11 +223,11 @@ class CsvProcessor {
         .pipe(csv())
         .on('data', (data) => results.push(data))
         .on('end', () => {
-          console.log(`Загружено ${results.length} записей из ${filePath}`);
+          console.log(`Loaded ${results.length} records from ${filePath}`);
           resolve(results);
         })
         .on('error', (error) => {
-          console.error(`Ошибка при чтении CSV файла ${filePath}:`, error);
+          console.error(`Error reading CSV file ${filePath}:`, error);
           reject(error);
         });
     });
@@ -248,17 +250,17 @@ async function loadDataToPinecone() {
     
     // Проверка существующих данных
     const documentCount = await vectorDB.countDocuments();
-    console.log(`В базе данных уже есть ${documentCount} документов`);
+    console.log(`There are ${documentCount} documents in the database`);
     
     // Проверка существования CSV-файла
     if (!fs.existsSync(csvFilePath)) {
-      console.error(`Файл ${csvFilePath} не найден`);
+      console.error(`File ${csvFilePath} not found`);
       return;
     }
     
     // Загрузка данных из CSV
     const articles = await csvProcessor.loadFromCsv(csvFilePath);
-    console.log(`Загружено ${articles.length} статей из CSV-файла`);
+    console.log(`Loaded ${articles.length} articles from CSV file`);
     
     // Счетчики для статистики
     let processed = 0;
@@ -271,7 +273,7 @@ async function loadDataToPinecone() {
       processed++;
       
       if (!article.URL) {
-        console.warn(`Статья #${processed} не содержит URL, пропускаю`);
+        console.warn(`Article #${processed} does not contain URL, skipping`);
         skipped++;
         continue;
       }
@@ -282,21 +284,21 @@ async function loadDataToPinecone() {
       // Проверка наличия документа в базе
       const exists = await vectorDB.checkDocument(id);
       if (exists) {
-        console.log(`Документ ${id} для URL ${article.URL} уже существует, пропускаю`);
+        console.log(`Document ${id} for URL ${article.URL} already exists, skipping`);
         skipped++;
         continue;
       }
       
       // Получение содержимого статьи
-      console.log(`Обработка статьи ${processed}/${articles.length}: ${article.URL}`);
+      console.log(`Processing article ${processed}/${articles.length}: ${article.URL}`);
       const extractedArticle = await contentExtractor.extractArticle(article.URL);
       if (!extractedArticle) {
-        console.warn(`Не удалось извлечь содержимое из ${article.URL}`);
+        console.warn(`Failed to extract content from ${article.URL}`);
         failed++;
         continue;
       }
       
-      console.log(`Создание эмбеддинга для статьи: ${extractedArticle.title}`);
+      console.log(`Creating embedding for article: ${extractedArticle.title}`);
       
       // Получение эмбеддинга для содержимого
       try {
@@ -312,9 +314,9 @@ async function loadDataToPinecone() {
         });
         
         added++;
-        console.log(`Документ ${id} успешно добавлен в Pinecone (${added} из ${articles.length})`);
+        console.log(`Document ${id} successfully added to Pinecone (${added} of ${articles.length})`);
       } catch (embeddingError) {
-        console.error(`Ошибка при создании эмбеддинга для ${article.URL}:`, embeddingError);
+        console.error(`Error creating embedding for ${article.URL}:`, embeddingError);
         failed++;
       }
       
@@ -322,29 +324,29 @@ async function loadDataToPinecone() {
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
     
-    console.log('\nЗагрузка данных завершена:');
-    console.log(`- Всего обработано: ${processed} записей`);
-    console.log(`- Успешно добавлено: ${added} документов`);
-    console.log(`- Пропущено: ${skipped} записей`);
-    console.log(`- Не удалось обработать: ${failed} записей`);
+    console.log('\nData loading completed:');
+    console.log(`- Total processed: ${processed} records`);
+    console.log(`- Successfully added: ${added} documents`);
+    console.log(`- Skipped: ${skipped} records`);
+    console.log(`- Failed to process: ${failed} records`);
     
     // Проверка итогового количества документов
     const finalCount = await vectorDB.countDocuments();
-    console.log(`\nИтоговое количество документов в базе: ${finalCount}`);
+    console.log(`\nFinal number of documents in the database: ${finalCount}`);
     
   } catch (error) {
-    console.error('Ошибка при загрузке данных:', error);
+    console.error('Error loading data:', error);
   }
 }
 
 // Запуск загрузки данных
-console.log('Начинаю загрузку данных из CSV в Pinecone...');
+console.log('Starting data loading from CSV to Pinecone...');
 loadDataToPinecone()
   .then(() => {
-    console.log('Загрузка данных завершена успешно');
+    console.log('Data loading completed successfully');
     process.exit(0);
   })
   .catch(error => {
-    console.error('Критическая ошибка при загрузке данных:', error);
+    console.error('Critical error during data loading:', error);
     process.exit(1);
   }); 

@@ -77,17 +77,17 @@ export class LLMService {
       
       Запрос пользователя: ${query}
       
-      ${context ? `Вот информация, которую ты ДОЛЖЕН использовать для ответа:\n\n${context}` : 'В базе знаний не найдено релевантной информации по этому запросу.'}
+      ${context ? `Here is the information you MUST use to answer the user's question:\n\n${context}` : 'No relevant information found in the knowledge base for this query.'}
       
-      ${context ? `Ответь на запрос пользователя, основываясь ТОЛЬКО на информации из предоставленного контекста.
-      Если в контексте недостаточно информации для полного ответа, укажи это явно.
-      Не используй свои общие знания, кроме случаев, когда это необходимо для понимания контекста.` 
-      : `Пожалуйста, сообщи пользователю, что информации по запросу не найдено в базе знаний,
-      и дай краткий общий ответ на вопрос, отметив, что это общая информация, а не из базы знаний.`}
+      ${context ? `Answer the user's question strictly based on the information provided in the context.
+      If there is insufficient information in the context to provide a complete answer, explicitly state this.
+      Do not use your general knowledge, except when it is necessary to understand the context.` 
+      : `Please inform the user that there is no information in the knowledge base for this query,
+      and provide a brief general answer to the question, noting that it is general information, not from the knowledge base.`}
       
-      Верни ответ в формате JSON со следующими полями:
-      - answer: твой ответ на запрос пользователя
-      - sources: массив источников, которые ты использовал (пустой массив, если не использовал никаких источников)
+      Return the answer in JSON format with the following fields:
+      - answer: your answer to the user's question
+      - sources: array of sources you used (empty array if no sources were used)
       `;
 
       try {
@@ -112,7 +112,7 @@ export class LLMService {
         } catch (error) {
           console.error('Error parsing LLM response:', error);
           return {
-            answer: 'Извините, произошла ошибка при обработке ответа.',
+            answer: 'Sorry, an error occurred while processing the response.',
             sources: [],
           };
         }
@@ -130,14 +130,14 @@ export class LLMService {
         }
         
         return {
-          answer: 'Извините, произошла ошибка при обращении к языковой модели. Пожалуйста, попробуйте позже.',
+          answer: 'Sorry, an error occurred while accessing the language model. Please try again later.',
           sources: [],
         };
       }
     } catch (error) {
       console.error('Error generating response with LLM:', error);
       return {
-        answer: 'Извините, произошла ошибка при генерации ответа.',
+        answer: 'Sorry, an error occurred while generating the response.',
         sources: [],
       };
     }

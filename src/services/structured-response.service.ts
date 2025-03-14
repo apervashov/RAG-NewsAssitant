@@ -69,22 +69,22 @@ export class StructuredResponseService {
       }
 
       const prompt = `
-      Ты - новостной аналитический агент, который отвечает на вопросы пользователей на основе предоставленного контекста.
+      You are a news analytics agent that answers questions based on the provided context.
       
-      Запрос пользователя: ${query}
+      User's query: ${query}
       
       ${context}
       
-      Пожалуйста, проанализируй запрос пользователя, используя предоставленный контекст.
-      Верни ответ в формате JSON со следующими полями:
-      - answer: твой подробный ответ на запрос пользователя
-      - sources: массив источников, которые ты использовал (оставь пустым, если не использовал никаких источников)
-      - confidence: степень уверенности в ответе от 0.0 до 1.0
-      - topics: массив основных тем, связанных с запросом (до 5)
-      - sentimentScore: оценка тональности ответа от -1.0 (негативная) до 1.0 (позитивная)
-      - keywords: ключевые слова, связанные с запросом и ответом (до 10)
+      Please analyze the user's query using the provided context.
+      Return the answer in JSON format with the following fields:
+      - answer: your detailed answer to the user's question
+      - sources: array of sources you used (leave empty if no sources were used)
+      - confidence: confidence score from 0.0 to 1.0
+      - topics: array of main topics related to the query (up to 5)
+      - sentimentScore: sentiment score from -1.0 (negative) to 1.0 (positive)
+      - keywords: keywords related to the query and answer (up to 10)
       
-      Твой ответ должен быть точным, информативным и структурированным.
+      Your answer should be accurate, informative and structured.
       `;
 
       
@@ -149,7 +149,7 @@ export class StructuredResponseService {
           span.end();
           
           return {
-            answer: 'Извините, произошла ошибка при обработке структурированного ответа.',
+            answer: 'Sorry, an error occurred while processing the structured response.',
             sources: [],
             confidence: 0.0,
             topics: [],
@@ -172,7 +172,7 @@ export class StructuredResponseService {
         }
         
         return {
-          answer: 'Извините, произошла ошибка при обращении к языковой модели. Пожалуйста, попробуйте позже.',
+          answer: 'Sorry, an error occurred while accessing the language model. Please try again later.',
           sources: [],
           confidence: 0.0,
           topics: [],
@@ -184,7 +184,7 @@ export class StructuredResponseService {
       console.error('Error generating structured response with LLM:', error);
       
       return {
-        answer: 'Извините, произошла ошибка при генерации структурированного ответа.',
+        answer: 'Sorry, an error occurred while generating the structured response.',
         sources: [],
         confidence: 0.0,
         topics: [],

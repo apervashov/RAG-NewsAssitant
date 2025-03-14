@@ -23,26 +23,26 @@ app.use(express.static(path.join(__dirname, 'public')));
 const apiKey = process.env.GOOGLE_API_KEY || '';
 
 if (!apiKey) {
-  console.error('GOOGLE_API_KEY не установлен в переменных окружения');
+  console.error('GOOGLE_API_KEY is not set in environment variables');
 }
 
 // Обработчик обычного запроса API
 app.post('/api/agent', async (req, res) => {
   try {
-    console.log('Получен запрос к /api/agent:', req.body);
+    console.log('Received request to /api/agent:', req.body);
     const { query } = req.body;
 
     if (!query) {
       return res.status(400).json({
-        error: 'Отсутствует query',
-        message: 'Параметр query обязателен для запроса'
+        error: 'Missing query',
+        message: 'The query parameter is required for the request'
       });
     }
 
     if (!apiKey) {
       return res.status(500).json({
-        error: 'API ключ не настроен',
-        message: 'Настройте GOOGLE_API_KEY в переменных окружения'
+        error: 'API key is not configured',
+        message: 'Set GOOGLE_API_KEY in environment variables'
       });
     }
 
@@ -73,9 +73,9 @@ app.post('/api/agent', async (req, res) => {
       ]
     });
   } catch (error) {
-    console.error('Ошибка в /api/agent:', error);
+    console.error('Error in /api/agent:', error);
     return res.status(500).json({
-      error: 'Внутренняя ошибка сервера',
+      error: 'Internal server error',
       message: error.message
     });
   }
@@ -84,13 +84,13 @@ app.post('/api/agent', async (req, res) => {
 // Обработчик потокового API
 app.post('/api/stream', async (req, res) => {
   try {
-    console.log('Получен запрос к /api/stream:', req.body);
+    console.log('Received request to /api/stream:', req.body);
     const { query } = req.body;
 
     if (!query) {
       return res.status(400).json({
-        error: 'Отсутствует query',
-        message: 'Параметр query обязателен для запроса'
+        error: 'Missing query',
+        message: 'The query parameter is required for the request'
       });
     }
 
@@ -102,10 +102,10 @@ app.post('/api/stream', async (req, res) => {
     res.setHeader('X-Accel-Buffering', 'no');
 
     // Начальное сообщение
-    res.write('Начинаю обработку запроса...\n\n');
+    res.write('Starting request processing...\n\n');
 
     if (!apiKey) {
-      res.write('Ошибка: API ключ не настроен. Настройте GOOGLE_API_KEY в переменных окружения.\n');
+      res.write('Error: API key is not configured. Set GOOGLE_API_KEY in environment variables.\n');
       res.end();
       return;
     }
@@ -123,12 +123,12 @@ app.post('/api/stream', async (req, res) => {
       Provide a comprehensive, informative and helpful response.
       `;
       
-      res.write('Отправляю запрос к Gemini API...\n\n');
+      res.write('Sending request to Gemini API...\n\n');
       
       // Потоковая генерация
       const streamingResponse = await model.generateContentStream(prompt);
       
-      res.write('Получен ответ от Gemini API:\n\n');
+      res.write('Received response from Gemini API:\n\n');
       
       // Обрабатываем потоковые данные
       for await (const chunk of streamingResponse.stream) {
@@ -137,24 +137,24 @@ app.post('/api/stream', async (req, res) => {
       }
       
       // Завершаем ответ
-      res.write('\n\nГенерация завершена.');
+      res.write('\n\nGeneration completed.');
       res.end();
       
     } catch (apiError) {
-      console.error('Ошибка при работе с API:', apiError);
-      res.write(`Ошибка при работе с API: ${apiError.message}\n`);
+      console.error('Error working with API:', apiError);
+      res.write(`Error working with API: ${apiError.message}\n`);
       res.end();
     }
     
   } catch (error) {
-    console.error('Ошибка в /api/stream:', error);
+    console.error('Error in /api/stream:', error);
     if (!res.headersSent) {
       return res.status(500).json({
-        error: 'Внутренняя ошибка сервера',
+        error: 'Internal server error',
         message: error.message
       });
     } else {
-      res.write(`\nПроизошла ошибка: ${error.message}`);
+      res.write(`\nAn error occurred: ${error.message}`);
       res.end();
     }
   }
@@ -162,16 +162,16 @@ app.post('/api/stream', async (req, res) => {
 
 // Обслуживаем HTML-страницу для всех остальных маршрутов
 app.get('*', (req, res) => {
-  console.log('Отдаю index.html для пути:', req.path);
+  console.log('Serving index.html for path:', req.path);
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Обработчик ошибок
 app.use((err, req, res, next) => {
-  console.error('Обработчик ошибок Express:', err);
+  console.error('Express error handler:', err);
   if (!res.headersSent) {
     res.status(500).json({
-      error: 'Необработанная ошибка сервера',
+      error: 'Unhandled server error',
       message: err.message
     });
   }
@@ -181,7 +181,7 @@ app.use((err, req, res, next) => {
 const port = process.env.PORT || 3000;
 if (process.env.NODE_ENV !== 'production') {
   app.listen(port, () => {
-    console.log(`Сервер запущен на порту ${port}`);
+    console.log(`Server is running on port ${port}`);
   });
 }
 
