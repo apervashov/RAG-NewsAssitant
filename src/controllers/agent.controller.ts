@@ -373,6 +373,21 @@ export class AgentController {
       throw error;
     }
   }
-} 
+}
 
-export { AgentController as agentController, AgentController as streamAgentController };
+// Создаем экземпляр контроллера
+const agentControllerInstance = new AgentController();
+
+// Инициализируем контроллер
+agentControllerInstance.initialize()
+  .then(() => console.log('Agent controller initialized'))
+  .catch((error) => console.error('Error initializing agent controller:', error));
+
+// Экспортируем функции-обработчики для маршрутов Express
+export const agentController = (req: Request, res: Response) => {
+  return agentControllerInstance.processQuery(req, res);
+};
+
+export const streamAgentController = (req: Request, res: Response) => {
+  return agentControllerInstance.streamQueryResponse(req, res);
+};
