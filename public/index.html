@@ -159,7 +159,7 @@
             const query = document.getElementById('query').value;
             responseDiv.textContent = 'Performing direct request...\n';
             
-            fetch('/agent', {
+            fetch('/api/agent', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -184,7 +184,7 @@
             
             responseDiv.textContent = 'Starting test with Fetch API...\n';
             
-            fetch('/agent/stream', {
+            fetch('/api/stream', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -243,7 +243,7 @@
             let chunkCount = 0;
             
             try {
-                let streamUrl = '/agent/stream';
+                let streamUrl = '/api/stream';
                 
                 try {
                     const testResponse = await fetch('/', {

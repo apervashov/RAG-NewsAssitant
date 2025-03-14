@@ -373,4 +373,18 @@ export class AgentController {
       throw error;
     }
   }
-} 
+}
+
+export const agentController = async (req: Request, res: Response) => {
+  // Ваш существующий код...
+};
+
+export const streamAgentController = async (req: Request, res: Response) => {
+  // Ваш существующий код...
+};
+
+// Добавьте эти функции для Vercel
+module.exports = {
+  agentController,
+  streamAgentController
+}; 
