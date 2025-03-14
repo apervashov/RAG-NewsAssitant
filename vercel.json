@@ -1,18 +1,11 @@
 {
   "version": 2,
-  "public": true,
-  "cleanUrls": true,
-  "functions": {
-    "api/*.js": {
-      "memory": 1024,
-      "maxDuration": 10
-    }
-  },
-  "rewrites": [
-    { "source": "/api/stream", "destination": "/api/stream.js" },
-    { "source": "/api/agent", "destination": "/api/agent.js" },
-    { "source": "/(.*\\.js|.*\\.css|.*\\.png|.*\\.jpg|.*\\.svg|.*\\.ico)", "destination": "/api/static.js" },
-    { "source": "/", "destination": "/api/index.js" },
-    { "source": "/(.*)", "destination": "/api/index.js" }
+  "builds": [
+    { "src": "index.js", "use": "@vercel/node" },
+    { "src": "public/**", "use": "@vercel/static" }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "index.js" },
+    { "src": "/(.*)", "dest": "index.js" }
   ]
 } 

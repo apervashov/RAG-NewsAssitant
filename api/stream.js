@@ -1,6 +1,6 @@
 const { streamAgentController } = require('../dist/controllers/agent.controller');
 
-module.exports = (req, res) => {
+module.exports = async (req, res) => {
   // CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -14,5 +14,14 @@ module.exports = (req, res) => {
   }
 
   // Process the request
-  return streamAgentController(req, res);
+  try {
+    return await streamAgentController(req, res);
+  } catch (error) {
+    console.error('Error in stream controller:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Internal Server Error', message: error.message });
+    } else {
+      res.end('\nError in stream processing');
+    }
+  }
 }; 

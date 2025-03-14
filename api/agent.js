@@ -1,6 +1,6 @@
 const { agentController } = require('../dist/controllers/agent.controller');
 
-module.exports = (req, res) => {
+module.exports = async (req, res) => {
   // CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -14,5 +14,10 @@ module.exports = (req, res) => {
   }
 
   // Process the request
-  return agentController(req, res);
+  try {
+    return await agentController(req, res);
+  } catch (error) {
+    console.error('Error in agent controller:', error);
+    res.status(500).json({ error: 'Internal Server Error', message: error.message });
+  }
 }; 
