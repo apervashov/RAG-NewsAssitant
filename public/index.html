@@ -141,7 +141,7 @@
             const responseDiv = document.getElementById('response');
             responseDiv.textContent = 'Checking basic request...';
             
-            fetch('http://localhost:3000/')
+            fetch('/')
                 .then(response => {
                     responseDiv.textContent += `\nStatus: ${response.status} ${response.statusText}`;
                     return response.text();
@@ -159,7 +159,7 @@
             const query = document.getElementById('query').value;
             responseDiv.textContent = 'Performing direct request...\n';
             
-            fetch('http://localhost:3000/agent', {
+            fetch('/agent', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -184,7 +184,7 @@
             
             responseDiv.textContent = 'Starting test with Fetch API...\n';
             
-            fetch('http://localhost:3000/agent/stream', {
+            fetch('/agent/stream', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -243,10 +243,10 @@
             let chunkCount = 0;
             
             try {
-                let streamUrl = 'http://localhost:3000/agent/stream';
+                let streamUrl = '/agent/stream';
                 
                 try {
-                    const testResponse = await fetch('http://localhost:3000/', {
+                    const testResponse = await fetch('/', {
                         method: 'GET',
                         cache: 'no-cache'
                     });
@@ -255,20 +255,7 @@
                         throw new Error(`Server is not available: ${testResponse.status}`);
                     }
                 } catch (e) {
-                    console.log("Trying port 3001...");
-                    try {
-                        const altResponse = await fetch('http://localhost:3001/', {
-                            method: 'GET',
-                            cache: 'no-cache'
-                        });
-                        
-                        if (altResponse.ok) {
-                            streamUrl = 'http://localhost:3001/agent/stream';
-                            console.log("Using port 3001");
-                        }
-                    } catch (altError) {
-                        console.error("Error checking port 3001:", altError);
-                    }
+                    console.log("Error connecting to main endpoint");
                 }
                 
                 console.log(`Sending request to ${streamUrl}`);
