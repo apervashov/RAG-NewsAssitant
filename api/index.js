@@ -1,2 +1,7 @@
 // Reexport the built version of the Express app
-module.exports = require('../dist/index').default; 
+const app = require('../dist/index').default;
+
+module.exports = (req, res) => {
+  // Emulating Express behavior in Vercel serverless environment
+  app(req, res);
+}; 

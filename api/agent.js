@@ -1,6 +1,6 @@
 const { agentController } = require('../dist/controllers/agent.controller');
 
-module.exports = async (req, res) => {
+module.exports = (req, res) => {
   // CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
